@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.pyd
+*.egg-info/
+build/
+dist/
+.ipynb_checkpoints/
+*.ipynb~*
+scratch/
+.vscode/
+Thumbs.db
