@@ -1,194 +1,190 @@
-# Miljöbyte: hemma (utan venv) ↔ skolan (venv + Jupyter)
+# Git Fusklapp v3 — Global & Virtuell miljö
 
-Snabb, praktisk fusklapp för att växla mellan din hemmamiljö och skolans venv/Jupyter-miljö.
-
----
-
-## 0) Snabbchecklista
-
-* **git pull**
-* Välj/aktivera **rätt Python** (global hemma / `.venv` i skolan)
-* I VS Code: **Select Interpreter** + (för notebooks) **Select Kernel**
-* Om paket saknas: `python -m pip install <paket>`
-* Kör en **sanity-cell** i notebook:
-
-  ```python
-  import sys, platform
-  print(sys.executable, platform.python_version())
-  ```
+**Mål:** ren commit‑historik, noll CRLF‑strul, små diffar (även i Jupyter), och en lugn start varje dag.
 
 ---
 
-## A) Hemma – utan venv (enkelt lokalt)
-
-**Varje pass**
-
-```powershell
-git pull
-python --version
-python fil.py                 # kör .py
-pip install <paket>           # installerar globalt
-```
-
-**Om du vill återskapa i skolan**
-
-```powershell
-pip freeze > requirements.txt
-git add requirements.txt
-git commit -m "deps: snapshot"
-git push
-```
-
-**Notebook hemma (.ipynb)**
-
-* Kernel = din **globala** Python.
-* Kontroll i första cellen:
-
-  ```python
-  import sys, platform
-  print(sys.executable, platform.python_version())
-  ```
+## Innehåll
+1. 0) Snabb sanity
+2. 1) Daglig loop (standardflöde)
+3. 2) Notebooks – policy (nbstripout)
+4. 3) Global Git‑policy (rebase/ff/autostash)
+5. 4) Repo‑standard (.gitattributes, .editorconfig, .gitignore)
+6. 5) Panik‑kit: ångra & rädda
+7. 6) Inspektera historiken
+8. 7) TL;DR
 
 ---
 
-## B) Skolan – med venv + Jupyter
-
-**Första gången på skol-datorn**
-
-```powershell
-git clone <repo-url> && cd <mapp>
-py -3.13 -m venv .venv
-.\.venv\Scripts\activate
-python -m pip install -U pip ipykernel
-python -m pip install -r requirements.txt   # om den finns
-python -m ipykernel install --user --name=py313-<repo> --display-name "Python 3.13 (.venv)"
-```
-
-**Varje pass**
+## 0) Snabb sanity
+I terminalen i **repo‑roten** (inte fel mapp):
 
 ```powershell
-git pull
-.\.venv\Scripts\activate
-python --version
+git rev-parse --show-toplevel   # ska peka på repo-roten
+pwd                              # dubbelkolla var du står
+dir -Force | findstr .git        # .git/ ska synas
 ```
 
-**I VS Code**
-
-* **Python: Select Interpreter** → `.venv\Scripts\python.exe`
-* **Jupyter: Select Kernel** → *Python 3.13 (.venv)* (py313-<repo>)
-* Sanity i notebook (se 0)
-
----
-
-## C) .py vs .ipynb – hur tänka?
-
-* **.py**
-
-  * Körs via terminal eller “Run Python File”.
-  * Paket installeras där din **aktiva** tolk pekar (global hemma, `.venv` i skolan).
-* **.ipynb (Jupyter)**
-
-  * Välj **rätt kernel** uppe till höger.
-  * Paket måste vara installerade i **just den kernelns** miljö.
-  * Byt kernel om något klagar på `ModuleNotFoundError`.
-
----
-
-## D) Paket – minnesregel
-
-Installera **alltid** via den tolk du kör med:
-
-```powershell
-python -m pip install <paket>
-```
-
-I notebook kan du även:
+I notebookens **första cell** (för att bekräfta .venv/kärna):
 
 ```python
-%pip install <paket>
+import sys, platform
+print(sys.executable)            # ...\.venv\Scripts\python.exe
+print(platform.python_version()) # t.ex. 3.13.5
 ```
 
 ---
 
-## E) Hemma ↔ Skola – recept
-
-**Hemma → Skola**
+## 1) Daglig loop (standardflöde)
+Minimal, ren och räcker 99% av fallen:
 
 ```powershell
-# hemma
-git pull
-pip freeze > requirements.txt
-git add requirements.txt && git commit -m "deps: snapshot" && git push
-# skolan (se B, installera från requirements.txt)
+git status
+git add -p             # eller: git add <filväg>
+git commit -m "exercise_2: solved 8–9 + sanity check"
+git push               # ev. första gång: git push -u origin main
 ```
 
-**Skola → Hemma**
+**Små regler:**
+- En tanke/uppgift per commit.
+- Konsekventa prefix: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`.
+- Undvik att amend:a efter push. Innan push → okej.
+
+---
+
+## 2) Notebooks – policy (nbstripout)
+**Varför:** outputs orsakar gigantiska diffar och onödiga konflikter.
+
+### Engångssetup per repo
+```powershell
+pip install nbstripout
+nbstripout --install              # aktiverar git-filter för .ipynb i detta repo
+```
+
+`.gitattributes` i repo‑roten (lägg till/behåll):
+```
+# Normalize line endings
+* text=auto eol=lf
+
+# Notebooks: strip outputs och ge bättre diff
+*.ipynb filter=nbstripout
+*.ipynb diff=ipynb
+```
+
+### Snabb verifikation när du vill
+```powershell
+git check-attr -a -- .\exercises\exercise_2.ipynb
+# ska visa: diff: ipynb  och  filter: nbstripout
+```
+
+### Om du råkat committa outputs men INTE pushat
+```powershell
+nbstripout .\exercises\exercise_2.ipynb --force
+git add .\exercises\exercise_2.ipynb
+git commit --amend --no-edit
+```
+
+> VS Code-väg: öppna notebook → meny (⋯) → **Clear All Outputs** → spara → commit.
+
+---
+
+## 3) Global Git‑policy (rebase/ff/autostash)
+Kör **en gång** på din dator för snyggare historik:
 
 ```powershell
-git pull
-# kör globalt eller skapa egen venv hemma
-py -3.13 -m venv .venv
-.\.venv\Scripts\activate
-python -m pip install -r requirements.txt
+git config --global init.defaultBranch main
+git config --global pull.rebase true       # pull = rebase
+git config --global rebase.autoStash true  # stash:a ändringar vid pull
+git config --global merge.ff only          # bara fast-forward merges
+git config --global core.autocrlf false
+git config --global core.eol lf
+```
+
+Sanity:
+```powershell
+git config --get-regexp "^(init\.defaultBranch|pull\.rebase|rebase\.autoStash|merge\.ff|core\.auto|core\.eol)"
 ```
 
 ---
 
-## F) Vanliga fel → snabblösning
+## 4) Repo‑standard
+Läggs i repo‑roten för stabilitet mellan maskiner/editors.
 
-* **ModuleNotFoundError**
+**.gitattributes**
+```
+* text=auto eol=lf
+*.ipynb filter=nbstripout
+*.ipynb diff=ipynb
+```
 
-  * Välj rätt kernel/tolk.
-  * Installera paket i den miljön: `python -m pip install <paket>` eller `%pip install <paket>`.
-* **Kernel-listan tom i VS Code**
+**.editorconfig**
+```
+root = true
 
-  * Installera extensions **Jupyter** & **Python** (Microsoft) och **Reload Window**.
-* **“python” hittas inte / fel tolk**
+[*]
+end_of_line = lf
+charset = utf-8
+insert_final_newline = true
+```
 
-  * Skola: aktivera `.venv`.
-  * Hemma: kolla `python --version` eller välj interpreter i VS Code.
-* **Sökväg med mellanslag (cd fail)**
-
-  * Citat: `cd "C:\\Users\\…\\STI-Data Engineer\\…"`
-* **Behöver nollställa skolmiljön**
-
-  ```powershell
-  deactivate
-  rmdir .venv /s /q
-  py -3.13 -m venv .venv
-  .\.venv\Scripts\activate
-  python -m pip install -U pip ipykernel
-  python -m pip install -r requirements.txt
-  python -m ipykernel install --user --name=py313-<repo> --display-name "Python 3.13 (.venv)"
-  ```
-
----
-
-## G) Git & ignore (rekommenderat)
-
-**.gitignore** (i repo-roten):
-
+**.gitignore (bas)**
 ```
 .venv/
 __pycache__/
+.ipynb_checkpoints/
+.vscode/
 *.py[cod]
 *.pyd
 *.egg-info/
 build/
 dist/
-.ipynb_checkpoints/
 *.ipynb~*
 scratch/
-.vscode/
 Thumbs.db
 ```
 
-Valfritt: `.gitattributes` för att slippa EOL-varningar på notebooks:
-
+> VS Code per-projekt: `.vscode/settings.json`
 ```
-*.ipynb -text
+{ "python.defaultInterpreterPath": ".venv/Scripts/python.exe" }
+```
+
+*(Valfritt nästa nivå)* `pre-commit` med `end-of-file-fixer`, `trailing-whitespace`, `mixed-line-ending`, och `nbstripout` kan läggas på senare för automatisk städ vid commit.
+
+---
+
+## 5) Panik‑kit: ångra & rädda
+- **Avstaga fil:** `git restore --staged <fil>`
+- **Kasta lokala ändringar i fil (försiktigt):** `git restore <fil>`
+- **Ångra senaste commit men behåll ändringar (ej pushad):** `git reset --soft HEAD~1`
+- **Ångra commit som redan är pushad (utan historia-krig):** `git revert <SHA>` → `git push`
+- **Avbryt rebase/merge:** `git rebase --abort` / `git merge --abort`
+- **Parkera WIP snabbt:** `git stash push -m "WIP"` → `git stash pop`
+
+---
+
+## 6) Inspektera historiken
+```powershell
+git log --oneline --graph --decorate -n 20
+git show --name-only <SHA>
+git diff --staged
+git blame <fil>
+```
+
+*(Valfritt alias)*
+```powershell
+git config --global alias.lg "log --oneline --graph --decorate --all"
+# använd: git lg
 ```
 
 ---
 
-**Done.** Kör checklistan högst upp när du byter miljö – då flyter allt.
+## 7) TL;DR
+- Jobba i repo‑roten. `git rev-parse --show-toplevel` är din kompass.
+- Standardflöde: `status` → `add -p` → `commit` → `push`.
+- Notebooks: **nbstripout påslaget** → outputs åker ut automatiskt.
+- Små, tydliga commits med prefix. Amend bara innan push.
+- `.gitattributes` + `.editorconfig` + `.gitignore` håller repot friskt.
+
+---
+
+_Senast uppdaterad: 2025‑09‑29_
