@@ -1,1 +1,6 @@
+# Normalize line endings
 * text=auto eol=lf
+
+# Notebooks: strip outputs och ge bättre diff
+*.ipynb filter=nbstripout
+*.ipynb diff=ipynb
